@@ -2,15 +2,14 @@ import pygame
 import sys
 import math
 import random
-import asyncio
+import socket
+import json
+from dotenv import load_dotenv
 
 # Init websocket client
 class FaceService:
-    def __init__(self, ):
-        self.base_ip = "127.0.0.10"
-        self.SECRET_KEY = "your_secret_key"
-        self.websocket = None
-        self.task = None
+    def __init__(self):
+        self.socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
 
         # Init pygame
         pygame.init()
@@ -48,27 +47,24 @@ class FaceService:
             'angry': { 'width': 100, 'height': 20, 'start_angle': 200, 'stop_angle': 340},
         }
 
-    async def consume_events(self):
-        async with websockets.connect(f"ws://{self.base_ip}:8765") as websocket:
-            self.websocket = websocket
-            while True:
-                message = await websocket.recv()
-                event = json.loads(message)
-                keys = event.keys()
-                if 'expression' in keys:
-                    talking = keys['talking'] if 'talking' in keys else False
-                    draw_face(event['expression'], talking)
-                else:
-                    print(f"Received message: {message}")
-
-    def start_client(self):
+    def start_client(self, socket_file_path):
         print("starting face")
-        self.draw_face('happy')
-        self.task = asyncio.get_event_loop().create_task(self.consume_events())
-        asyncio.get_event_loop().run_forever()
-        
+        if os.path.exists(socket_file_path):
+            os.remove(socket_file_path)
 
+        self.socket_path = socket_file_path
+        self.socket.bind(self.socket_path)
+        self.socket.listen(1)
 
+        self.draw_face('happy', False)
+        conn, addr = self.socket.accept()
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            data_object = json.loads(data)
+            self.draw_face(data_object["data"]["expression"], data_object["data"]["talking"])
+            conn.sendall("ack".encode('utf-8'))
    
     def draw_face(self, expression, talking = False):
         screen = self.screen
@@ -150,7 +146,7 @@ class FaceService:
 # Main loop
 if "__main__" == __name__:
     face_service = FaceService()    
-    demo = sys.argv[1]
+    demo = sys.argv[1] if len(sys.argv) > 0 else None
     running = True
     expression = "normal"
     talking = False
@@ -176,7 +172,9 @@ if "__main__" == __name__:
 
             face_service.draw_face(expression, talking)
     else:
-        face_service.start_client()
+        load_dotenv()
+        file_path = os.getenv("FACE_SOCKET_FILE")
+        face_service.start_client(file_path)
 
     pygame.quit()
     sys.exit()

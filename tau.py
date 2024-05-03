@@ -10,6 +10,8 @@ from services.actions_service import extract_actions, is_action_supported, parse
 from services.response_processor import emit_classified_sentences
 from services.speech_queue import SpeechQueue
 from services.memory_service import MemoryService
+from clients.face_socket_service import FaceSocketClient
+
 import re
 
 from modelproviders.openai_api_client import play_mp3, speechify
@@ -18,6 +20,8 @@ load_dotenv()  # Load environment variables from .env file
 API_KEY = os.getenv("ANTHROPIC_API_KEY")
 HISTORY_FILE = "conversation_history.txt"
 SYSTEM_PROMPT_FILE = "prompts/system.md"
+
+file_path = os.getenv("FACE_SOCKET_FILE")
 
 if not API_KEY:
     raise ValueError("ANTHROPIC_API_KEY environment variable is not set.")
@@ -63,7 +67,7 @@ def get_time_since_last(history):
     else:
         return None
 
-def main_tau_loop(user_input):
+def main_tau_loop(user_input, face_client):
     speech_queue = SpeechQueue()
     memory_service = MemoryService()
 
@@ -167,6 +171,9 @@ def main_tau_loop(user_input):
 
 if __name__ == "__main__":
     user_input = None
+    face_client = FaceSocketClient()
+    face_client.init_socket(file_path)
+
     while (user_input != ""):
-        user_input = main_tau_loop(user_input)
+        user_input = main_tau_loop(user_input, face_client)
         

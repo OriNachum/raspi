@@ -15,4 +15,5 @@ tflite-runtime
 voyageai
 pinecone-client
 pygame
+pyaudio
 #tf-runtimex
